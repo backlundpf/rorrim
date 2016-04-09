@@ -1,0 +1,118 @@
+var things = {
+	clientId: 8fc9c132-4991-4b8c-b6fc-7d00054e00ab
+	clientSecret: 6e77c163-54d5-4e86-a70b-33e90e12071f
+	endpointsUri: 'https://graph.api.smartthings.com/api/smartapps/endpoints';
+	thingsList: [],
+	thingsLocation: '.things',
+	updateInterval: 4000,
+	statusUpdateInteval: 4000,
+	fadeInterval: 4000,
+	intervalId: null,
+	statusIntervalId: null
+};
+
+things.authorize = function () {
+	var request = require('request');
+	var express = require('express'),
+		app = express();
+
+	var oauth2 = require('simple-oauth2')({
+		clientID: this.clientId,
+		clientSecret: this.clientSecret,
+		site: 'https://graph.api.smartthings.com'
+	});
+
+	// Authorization uri definition
+	var authorization_uri = oauth2.authCode.authorizeURL({
+		redirect_uri: 'http://localhost:3000/callback',
+		scope: 'app',
+		state: '3(#0/!~'
+	});
+
+	// Initial page redirecting to Github
+	app.get('/auth', function (req, res) {
+		res.redirect(authorization_uri);
+	});
+
+	// Callback service parsing the authorization token and asking for the access token
+	app.get('/callback', function (req, res) {
+		var code = req.query.code;
+
+		oauth2.authCode.getToken({
+			code:code,
+			redirect_uri: 'http://localhost:3000/callback',
+		}, saveToken);
+
+		function saveToken(error, result) {
+			if (error) { console.log('Access Token Error', error.message); }
+
+			// result.access_token is the token, get the endpoint
+			var bearer = result.access_token;
+			var sendreq = { method: "GET", uri: endpoints_rui + "?access_token=" + result.access_token };
+			request(sendreq, function (err, res1, body) {
+				var endpoints = JSON.parse(body);
+				
+				//we just show the final access URL and Bearer code
+				var access_url = endpoints[0].url
+				res.send('<pre>https://graph.api.smartthings.com/' + access_url + '</pre><br><pre>Bearer ' + bearer + '</pre>');
+			});
+		}
+	});
+
+	app.get('/', function(req, res) {
+		res.send('<a href="/auth">Connect with SmartThings</a>');
+	});
+
+	app.listen(3000);
+
+	console.log('Express server started on port 3000');
+}
+	
+		
+
+things.updateThingsStatus = function () {
+
+}
+
+things.updateThings = function () {
+
+	var thing1 = {
+		thing: "switch 1",
+		state: "on"
+	};
+	var thing2 = {
+		thing: "Christmas Switch",
+		state: "off"
+	};
+	
+	var testList = [ thing1, thing2];
+
+	table = $('<table/>').addClass('xsmall').addClass('things-table');
+
+	for (var index = 0; index < testList.length; index++) {
+		var thing = testList[index];
+
+		var row = $('<tr/>');
+		row.append($('<td/>').html(thing.thing).addClass('description'));
+		row.append($('<td/>').html(thing.state).addClass('things dimmed'));
+		table.append(row);
+	}
+
+
+	$(this.thingsLocation).updateWithText(table, this.fadeInterval);
+	
+}
+
+things.init = function () {
+
+	this.updateThings();
+
+	this.intervalId = setInterval(function () {
+		this.updateThings();
+	}.bind(this), this.updateInterval);
+
+	this.statusIntervalId = setInterval(function () {
+		this.updateThingsStatus();
+	}.bind(this), this.statusUpdateInterval);
+
+}
